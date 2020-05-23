@@ -1,0 +1,11 @@
+version: "3"
+services:
+  app:
+    image: ilyalatt/onliner-by-flat-bot:latest
+
+    # https://github.com/jlund/docker-chrome-pulseaudio/issues/8#issue-166464652
+    security_opt:
+      - seccomp:unconfined
+
+    volumes:
+      - ./data:/app/data

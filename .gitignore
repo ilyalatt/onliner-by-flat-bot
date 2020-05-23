@@ -2,8 +2,5 @@
 *.user
 bin
 obj
-config*.json
-resp.txt
-build
-.local-chromium
-state_*.json
+
+data

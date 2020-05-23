@@ -24,7 +24,7 @@ namespace OnlinerByFlatBot
     public sealed class ChannelConfig
     {
         public string Name { get; set; }
-        public bool Enabled { get; set; }
+        public bool? Enabled { get; set; }
         public int TelegramChatId { get; set; }
         public OnlinerConfig Onliner { get; set; }
         public RouteConfig Route { get; set; }

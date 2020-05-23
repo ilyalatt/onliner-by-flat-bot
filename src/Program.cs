@@ -179,6 +179,7 @@ namespace OnlinerByFlatBot
 
         static async Task Main()
         {
+            Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, "data");
             Console.OutputEncoding = Encoding.UTF8;
 
             var cfg = await RootConfig.Read();
@@ -191,7 +192,7 @@ namespace OnlinerByFlatBot
             };
             telegramBot.StartReceiving();
 
-            await cfg.Channels.Filter(x => x.Enabled).Map(async channel =>
+            await cfg.Channels.Filter(x => x.Enabled ?? true).Map(async channel =>
             {
                 var state = (await State.Read(channel.Name)).IfNone(() => new State { LastScrapedEntityDate = DateTime.Now });
                 await BotPollyPolicy.ExecuteAsync(() => RunBot(channel, telegramBot, state));
