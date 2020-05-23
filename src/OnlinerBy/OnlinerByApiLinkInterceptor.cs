@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using PuppeteerSharp;
 
@@ -14,13 +13,8 @@ namespace OnlinerByFlatBot.OnlinerBy {
         }
         
         public static async Task<OnlinerByApiLinkInterceptor> Launch() {
-            var browserFetcher = new BrowserFetcher();
-            const int browserRevision = BrowserFetcher.DefaultRevision;
-            var revisionInfo = await browserFetcher.DownloadAsync(browserRevision);
-
             var browser = await Puppeteer.LaunchAsync(new LaunchOptions
             {
-                ExecutablePath = revisionInfo.ExecutablePath,
                 Headless = true
             });
             return new OnlinerByApiLinkInterceptor(browser);

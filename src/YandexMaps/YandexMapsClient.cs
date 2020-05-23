@@ -36,13 +36,8 @@ namespace OnlinerByFlatBot.YandexMaps
 
         public static async Task<YandexMapsClient> Launch()
         {
-            var browserFetcher = new BrowserFetcher();
-            const int browserRevision = BrowserFetcher.DefaultRevision;
-            var revisionInfo = await browserFetcher.DownloadAsync(browserRevision);
-
             var browser = await Puppeteer.LaunchAsync(new LaunchOptions
             {
-                ExecutablePath = revisionInfo.ExecutablePath, // "/usr/local/bin/chromium",
                 Headless = true,
                 DefaultViewport = ViewPort,
                 Args = new[] { "--start-fullscreen" }
