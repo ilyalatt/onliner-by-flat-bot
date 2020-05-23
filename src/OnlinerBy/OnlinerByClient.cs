@@ -20,13 +20,13 @@ namespace OnlinerByFlatBot.OnlinerBy
 
         public void Dispose() => _flurlClient.Dispose();
 
-        public OnlinerByClient(Some<OnlinerConfig> someCfg)
+        public OnlinerByClient(Some<OnlinerApiLink> someApiLink)
         {
-            var cfg = someCfg.Value;
-            _url = cfg.SearchUrl;
+            var apiLink = someApiLink.Value;
+            _url = apiLink.Url;
 
             var cookies = new CookieContainer();
-            cfg.Cookies.Apply(Optional).Iter(cookieStr => cookieStr
+            apiLink.Cookies.Apply(Optional).Iter(cookieStr => cookieStr
                 .Split("; ", StringSplitOptions.RemoveEmptyEntries).Map(x => x.Split('=', 2)).Map(x => (x[0], x[1]))
                 .Map(t => new Cookie(t.Item1, t.Item2, "/", "r.onliner.by")).Iter(cookies.Add)
             );

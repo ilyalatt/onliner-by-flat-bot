@@ -84,7 +84,7 @@ namespace OnlinerByFlatBot
             ITelegramBotClient tg,
             OnlinerByClient onlinerClient,
             YandexMapsClient yandexMapsClient,
-            RouteConfig routeConfig,
+            Location routeDestination,
             ChatId chatId,
             string channelName,
             State state
@@ -145,7 +145,7 @@ namespace OnlinerByFlatBot
                 ).Cast<IAlbumInputMedia>()
                 .Apply(SendPhotosResiliently);
 
-            var wr = await yandexMapsClient.Apply(YandexMapsWithPolly(x => x.Search(flat.Location, routeConfig.Location)));
+            var wr = await yandexMapsClient.Apply(YandexMapsWithPolly(x => x.Search(flat.Location, routeDestination)));
             await SendPhotoResiliently(wr.MapScreenshot, "map.png");
             await wr.RoutesScreenshot.IterAsync(x => SendPhotoResiliently(x, "routes.png"));
 
@@ -165,11 +165,15 @@ namespace OnlinerByFlatBot
             return unit;
         };
 
-        static async Task RunBot(ChannelConfig cfg, ITelegramBotClient telegramBot, State state)
-        {
-            using var onlinerClient = new OnlinerByClient(cfg.Onliner);
-            using var yandexMapsClient = await YandexMapsClient.Launch();
-            var handleFlat = HandleFlat(telegramBot, onlinerClient, yandexMapsClient, cfg.Route, new ChatId(cfg.TelegramChatId), cfg.Name, state);
+        static async Task RunBot(ChannelConfig cfg, ITelegramBotClient telegramBot, State state) {
+            Console.WriteLine($"Init channel {cfg.Name}.");
+            await using var onlinerByApiLinkInterceptor = await OnlinerByApiLinkInterceptor.Launch();
+            var apiLink = await onlinerByApiLinkInterceptor.Intercept(cfg.OnlinerUrl);
+            using var onlinerClient = new OnlinerByClient(apiLink);
+            await using var yandexMapsClient = await YandexMapsClient.Launch();
+            var routeDestination = Location.ParseYandexMapsUrl(cfg.RouteDestinationUrl);
+            Console.WriteLine($"Channel {cfg.Name} is initialized.");
+            var handleFlat = HandleFlat(telegramBot, onlinerClient, yandexMapsClient, routeDestination, new ChatId(cfg.TelegramChatId), cfg.Name, state);
             var isNotRoom = FlatType.Match(_: () => true, room: () => false);
             await GetOnlinerFlatUpdatesStream(onlinerClient, state.LastScrapedEntityDate)
                 .Where(x => x.IsOwner)

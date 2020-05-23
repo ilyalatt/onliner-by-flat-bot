@@ -7,7 +7,7 @@ using static LanguageExt.Prelude;
 
 namespace OnlinerByFlatBot.YandexMaps
 {
-    public sealed class YandexMapsClient : IDisposable
+    public sealed class YandexMapsClient : IAsyncDisposable
     {
         static readonly ViewPortOptions ViewPort = new ViewPortOptions
         {
@@ -28,10 +28,10 @@ namespace OnlinerByFlatBot.YandexMaps
         readonly Page _page;
         YandexMapsClient(Page page) => _page = page;
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            _page.Dispose();
-            _page.Browser.Dispose();
+            await _page.DisposeAsync();
+            await _page.Browser.DisposeAsync();
         }
 
         public static async Task<YandexMapsClient> Launch()
@@ -76,7 +76,7 @@ namespace OnlinerByFlatBot.YandexMaps
         async Task<Option<byte[]>> GetRoutesScreenshot()
         {
             await _page.EvaluateExpressionAsync(
-                "[...document.querySelectorAll('.route-form-view')].forEach(x => x.classList.remove('_active'))"
+                "[...document.querySelectorAll('.route-snippet-view')].forEach(x => x.classList.remove('_active'))"
             );
             await HideElements(
                 ".popup",
@@ -112,7 +112,9 @@ namespace OnlinerByFlatBot.YandexMaps
                 ".map-controls-view",
                 "._noprint",
                 ".map-copyrights",
-                ".sidebar-container"
+                ".sidebar-container",
+                ".search-dock-view",
+                ".map-controls__group"
             );
             await Task.Delay(3000); // rendering
 
