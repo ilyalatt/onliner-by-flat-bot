@@ -2,7 +2,7 @@
 
 ## Quick Start
 
-* Obtain Telegram bot token (you can ask @BotFather for one).
+* Obtain Telegram bot token (you can ask `@BotFather` for one).
 * Clone the repository (or download only `docker-compose.yaml`).
 * Create `data` directory.
 * Create `data/config.json`.
