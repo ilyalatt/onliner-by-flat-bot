@@ -96,21 +96,27 @@ namespace OnlinerByFlatBot
                     photo: bts,
                     ext: x.GetExtension(url)
                 ))));
+            
+            const int PhotoSizeLimit = 10 * 1024 * 1024;
+            static bool IsAcceptablePhoto(byte[] photo) => photo.Length < PhotoSizeLimit;
+
             Task SendPhotoResiliently(
                 byte[] photo,
                 string fileName,
                 string caption = null,
                 bool disableNotification = true
             ) =>
-                TelegramWithPolly(x => x.SendPhotoAsync(
-                    chatId: chatId,
-                    photo: new InputOnlineFile(
-                        new MemoryStream(photo),
-                        fileName
-                    ),
-                    caption: caption,
-                    disableNotification: disableNotification
-                ))(tg);
+                TelegramWithPolly(x =>
+                    x.SendPhotoAsync(
+                        chatId: chatId,
+                        photo: new InputOnlineFile(
+                            new MemoryStream(photo),
+                            fileName
+                        ),
+                        caption: caption,
+                        disableNotification: disableNotification
+                    )
+                )(tg);
 
             var timeSinceCreation = Period.Between(flat.CreatedAt.ToLocalDateTime(), flat.UpdatedAt.ToLocalDateTime());
             var isNew = timeSinceCreation.Equals(Period.Zero);
@@ -139,15 +145,17 @@ namespace OnlinerByFlatBot
             Task SendPhotosResiliently(IEnumerable<IAlbumInputMedia> photos) =>
                 TelegramWithPolly(x => x.SendMediaGroupAsync(photos, chatId, disableNotification: true))(tg);
 
-            Task SendPhotoBatch(IEnumerable<(byte[], string)> photoSeq) =>
-                photoSeq.Map((idx, t) =>
+            Task SendPhotoBatch(IEnumerable<(byte[], string)> photoSeq) => photoSeq
+                .Filter(x => IsAcceptablePhoto(x.Item1))
+                .Map((idx, t) =>
                     new InputMediaPhoto(new InputMedia(new MemoryStream(t.Item1), $"{idx}{t.Item2}"))
-                ).Cast<IAlbumInputMedia>()
+                )
+                .Cast<IAlbumInputMedia>()
                 .Apply(SendPhotosResiliently);
 
             var wr = await yandexMapsClient.Apply(YandexMapsWithPolly(x => x.Search(flat.Location, routeDestination)));
-            await SendPhotoResiliently(wr.MapScreenshot, "map.png");
-            await wr.RoutesScreenshot.IterAsync(x => SendPhotoResiliently(x, "routes.png"));
+            await SendPhotoResiliently(wr.MapScreenshot, "map.jpeg");
+            await wr.RoutesScreenshot.IterAsync(x => SendPhotoResiliently(x, "routes.jpeg"));
 
             try
             {

@@ -32,6 +32,12 @@ namespace OnlinerByFlatBot.OnlinerBy {
             await page.SetRequestInterceptionAsync(true);
             try {
                 await page.GoToAsync(onlinerUrl);
+                var apiUrlTask = tcs.Task;
+                var timeout = TimeSpan.FromSeconds(10);
+                var timeoutTask = Task.Delay(timeout);
+                if (await Task.WhenAny(apiUrlTask, timeoutTask) == timeoutTask) {
+                    throw new TimeoutException($"Onliner API link interception failed by timeout ({timeout}).");
+                }
                 var apiUrl = await tcs.Task;
                 return new OnlinerApiLink(apiUrl, "");
             }
