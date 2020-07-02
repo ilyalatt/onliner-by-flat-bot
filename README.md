@@ -33,7 +33,3 @@
 * Clone the repo.
 * Setup `data/config.json`.
 * Execute `dotnet run --project src` in the repo directory.
-
-## There are no logs
-
-Yeah, I am too lazy. You can create an issue for this.

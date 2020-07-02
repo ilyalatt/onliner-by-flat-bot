@@ -1,11 +1,11 @@
-﻿using System;
+﻿using Serilog;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reactive.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using OnlinerByFlatBot.Extensions;
 using OnlinerByFlatBot.OnlinerBy;
@@ -13,7 +13,6 @@ using OnlinerByFlatBot.OnlinerBy.Model;
 using OnlinerByFlatBot.YandexMaps;
 using Flurl.Http;
 using LanguageExt;
-using LanguageExt.SomeHelp;
 using NodaTime;
 using NodaTime.Extensions;
 using Polly;
@@ -25,6 +24,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.InputFiles;
 using static LanguageExt.Prelude;
 using Unit = LanguageExt.Unit;
+using System.Diagnostics;
 
 namespace OnlinerByFlatBot
 {
@@ -69,7 +69,7 @@ namespace OnlinerByFlatBot
                 );
                 var penalty = retryAfter - delay;
                 if (penalty > TimeSpan.Zero) {
-                    Console.WriteLine($"Telegram penalty of {(int) penalty.TotalSeconds}s.");
+                    Log.Warning($"Telegram request penalty of {(int) penalty.TotalSeconds}s.");
                     await Task.Delay(penalty);
                 }
             });
@@ -87,7 +87,7 @@ namespace OnlinerByFlatBot
 
         static readonly AsyncRetryPolicy BotPollyPolicy = Policy
             .Handle<Exception>()
-            .WaitAndRetryForeverAsync(sleepDurationProvider: _ => TimeSpan.FromSeconds(10), onRetry: (ex, _) => Console.WriteLine(ex));
+            .WaitAndRetryForeverAsync(sleepDurationProvider: _ => TimeSpan.FromSeconds(10), onRetry: (ex, _) => Log.Error(ex.Demystify().ToString()));
 
         static Func<ITelegramBotClient, Task<T>> TelegramWithDelayAndPolly<T>(Func<ITelegramBotClient, Task<T>> f) =>
             x => TelegramPollyPolicy.ExecuteAsync(() => f(x).Apply(TelegramDelay));
@@ -149,6 +149,7 @@ namespace OnlinerByFlatBot
                 $"{flat.Address.TrimStart("Минск, ")}",
                 flat.Url
             }.Apply(xs => string.Join(Environment.NewLine, xs));
+            Log.Information($"[{channelName}] Processing flat:" + Environment.NewLine + txt);
 
             try
             {
@@ -188,16 +189,17 @@ namespace OnlinerByFlatBot
             state.LastScrapedEntityDate = flat.UpdatedAt;
             await State.Save(channelName, state);
 
+            Log.Information($"[{channelName}] The flat is processed.");
             return unit;
         };
 
         static async Task RunBot(ChannelConfig cfg, ITelegramBotClient telegramBot, State state) {
-            Console.WriteLine($"Init channel {cfg.Name}.");
+            Log.Information($"[{cfg.Name}] Initilization.");
             var apiLink = await OnlinerByApiLinkInterceptor.Intercept(cfg.OnlinerUrl);
             using var onlinerClient = new OnlinerByClient(apiLink);
             await using var yandexMapsClient = await YandexMapsClient.Launch();
             var routeDestination = Location.ParseYandexMapsUrl(cfg.RouteDestinationUrl);
-            Console.WriteLine($"Channel {cfg.Name} is initialized.");
+            Log.Information($"[{cfg.Name}] Initialized.");
             var handleFlat = HandleFlat(telegramBot, onlinerClient, yandexMapsClient, routeDestination, new ChatId(cfg.TelegramChatId), cfg.Name, state);
             var isNotRoom = FlatType.Match(_: () => true, room: () => false);
             await GetOnlinerFlatUpdatesStream(onlinerClient, state.LastScrapedEntityDate)
@@ -209,7 +211,12 @@ namespace OnlinerByFlatBot
         static async Task Main()
         {
             Environment.CurrentDirectory = Path.Combine(Environment.CurrentDirectory, "data");
-            Console.OutputEncoding = Encoding.UTF8;
+
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.Console()
+                .WriteTo.File("log_.txt", rollingInterval: RollingInterval.Day)
+                .CreateLogger();
 
             var cfg = await RootConfig.Read();
 
@@ -217,7 +224,7 @@ namespace OnlinerByFlatBot
             telegramBot.OnMessage += (x, y) =>
             {
                 var msg = y.Message;
-                Console.WriteLine($"{msg.Chat.Id} @{msg.Chat.Username}: {msg.Text}");
+                Log.Information($"Incoming message from @{msg.Chat.Username} ({msg.Chat.Id}): {msg.Text}.");
             };
             telegramBot.StartReceiving();
 
