@@ -5,16 +5,11 @@ using Newtonsoft.Json;
 
 namespace OnlinerByFlatBot
 {
-    public sealed class TgBotConfig
-    {
-        public int ChatId { get; set; }
-    }
-
     public sealed class ChannelConfig
     {
         public string Name { get; set; }
         public bool? Enabled { get; set; }
-        public int TelegramChatId { get; set; }
+        public long TelegramChatId { get; set; }
         public string OnlinerUrl { get; set; }
         public string RouteDestinationUrl { get; set; }
     }
