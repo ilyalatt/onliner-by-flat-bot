@@ -33,11 +33,14 @@ namespace OnlinerByFlatBot
         static Task<T> Delay<T>(Task<T> task, int delayInMs) =>
             task.Bind(r => Task.Delay(delayInMs).ToUnit().Map(_ => r));
 
-        static Task<T> DelayRnd<T>(Task<T> task) =>
+        static Task<T> OnlinerDelay<T>(Task<T> task) =>
             Delay(task, Rnd.NextInt32(2000, 5000));
+	
+        static Task<T> TelegramDelay<T>(Task<T> task) =>
+            Delay(task, 500);
 
         static IObservable<Arr<Flat>> GetOnlinerFlatScrapeStream(OnlinerByClient onlinerClient) =>
-            RxHelpers.Generate(() => onlinerClient.GetLatestUpdate().Apply(DelayRnd));
+            RxHelpers.Generate(() => onlinerClient.GetLatestUpdate().Apply(OnlinerDelay));
 
         static IObservable<Flat> GetOnlinerFlatUpdatesStream(OnlinerByClient onlinerClient, DateTime lastScrapedEntityDate) =>
             GetOnlinerFlatScrapeStream(onlinerClient)
@@ -72,10 +75,7 @@ namespace OnlinerByFlatBot
             .WaitAndRetryForeverAsync(sleepDurationProvider: _ => TimeSpan.FromSeconds(10), onRetry: (ex, _) => Console.WriteLine(ex));
 
         static Func<ITelegramBotClient, Task<T>> TelegramWithDelayAndPolly<T>(Func<ITelegramBotClient, Task<T>> f) =>
-            async x => {
-                await Task.Delay(500);
-                return await TelegramPollyPolicy.ExecuteAsync(() => f(x));
-            };
+            x => TelegramPollyPolicy.ExecuteAsync(() => f(x)).Apply(TelegramDelay);
 
         static Func<OnlinerByClient, Task<T>> OnlinerByWithPolly<T>(Func<OnlinerByClient, Task<T>> f) =>
             x => OnlinerByPollyPolicy.ExecuteAsync(() => f(x));
