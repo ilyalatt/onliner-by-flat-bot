@@ -11,6 +11,7 @@ namespace OnlinerByFlatBot.OnlinerBy {
             {
                 Headless = true
             });
+            await Task.Delay(1000); // avoids PuppeteerSharp.NavigationException: Navigation failed because browser has disconnected!
             var page = await browser.NewPageAsync();
             page.Request += async (_, args) => {
                 var request = args.Request;
