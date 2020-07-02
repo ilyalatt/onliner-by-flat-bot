@@ -15,7 +15,7 @@
     <PackageReference Include="PuppeteerSharp" Version="2.0.3" />
     <PackageReference Include="System.Reactive" Version="4.4.1" />
     <PackageReference Include="System.Reactive.Observable.Aliases" Version="4.4.1" />
-    <PackageReference Include="Telegram.Bot" Version="15.5.1" />
+    <PackageReference Include="Telegram.Bot" Version="15.7.1" />
   </ItemGroup>
 
 </Project>
