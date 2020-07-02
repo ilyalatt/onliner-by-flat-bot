@@ -35,10 +35,10 @@ namespace OnlinerByFlatBot
 
         static Task<T> OnlinerDelay<T>(Task<T> task) =>
             Delay(task, Rnd.NextInt32(2000, 5000));
-	
+
         static Task<T> TelegramDelay<T>(Task<T> task) =>
             Delay(task, 500);
-
+	
         static IObservable<Arr<Flat>> GetOnlinerFlatScrapeStream(OnlinerByClient onlinerClient) =>
             RxHelpers.Generate(() => onlinerClient.GetLatestUpdate().Apply(OnlinerDelay));
 
@@ -54,10 +54,25 @@ namespace OnlinerByFlatBot
             Math.Pow(2, retryNumber).Apply(x => x * 1000)
             .Apply(x => x + Rnd.NextInt32(0, (int) (x / 3)))
             .Apply(TimeSpan.FromMilliseconds);
-
+        
         static readonly AsyncRetryPolicy TelegramPollyPolicy = Policy
             .Handle<ApiRequestException>()
-            .WaitAndRetryAsync(6, ExpDelay);
+            .Or<HttpRequestException>() // https://github.com/TelegramBots/Telegram.Bot/issues/891
+            .WaitAndRetryAsync(6, ExpDelay, async (exception, delay) => {
+                var retryAfter = TimeSpan.FromSeconds(
+                    (exception as ApiRequestException)?.Parameters?.RetryAfter
+                    ?? (
+                        exception is HttpRequestException e && e.Message.Contains("Too Many Requests")
+                        ? 20
+                        : 0
+                    )
+                );
+                var penalty = retryAfter - delay;
+                if (penalty > TimeSpan.Zero) {
+                    Console.WriteLine($"Telegram penalty of {(int) penalty.TotalSeconds}s.");
+                    await Task.Delay(penalty);
+                }
+            });
 
         static readonly AsyncRetryPolicy OnlinerByPollyPolicy = Policy
             .Handle<HttpRequestException>()
@@ -75,7 +90,7 @@ namespace OnlinerByFlatBot
             .WaitAndRetryForeverAsync(sleepDurationProvider: _ => TimeSpan.FromSeconds(10), onRetry: (ex, _) => Console.WriteLine(ex));
 
         static Func<ITelegramBotClient, Task<T>> TelegramWithDelayAndPolly<T>(Func<ITelegramBotClient, Task<T>> f) =>
-            x => TelegramPollyPolicy.ExecuteAsync(() => f(x)).Apply(TelegramDelay);
+            x => TelegramPollyPolicy.ExecuteAsync(() => f(x).Apply(TelegramDelay));
 
         static Func<OnlinerByClient, Task<T>> OnlinerByWithPolly<T>(Func<OnlinerByClient, Task<T>> f) =>
             x => OnlinerByPollyPolicy.ExecuteAsync(() => f(x));
