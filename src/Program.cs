@@ -175,8 +175,7 @@ namespace OnlinerByFlatBot
 
         static async Task RunBot(ChannelConfig cfg, ITelegramBotClient telegramBot, State state) {
             Console.WriteLine($"Init channel {cfg.Name}.");
-            await using var onlinerByApiLinkInterceptor = await OnlinerByApiLinkInterceptor.Launch();
-            var apiLink = await onlinerByApiLinkInterceptor.Intercept(cfg.OnlinerUrl);
+            var apiLink = await OnlinerByApiLinkInterceptor.Intercept(cfg.OnlinerUrl);
             using var onlinerClient = new OnlinerByClient(apiLink);
             await using var yandexMapsClient = await YandexMapsClient.Launch();
             var routeDestination = Location.ParseYandexMapsUrl(cfg.RouteDestinationUrl);

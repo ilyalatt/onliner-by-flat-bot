@@ -1,28 +1,17 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using PuppeteerSharp;
 
 namespace OnlinerByFlatBot.OnlinerBy {
-    public sealed class OnlinerByApiLinkInterceptor : IAsyncDisposable {
-        readonly Browser _browser;
-        OnlinerByApiLinkInterceptor(Browser browser) => _browser = browser;
-
-        public async ValueTask DisposeAsync()
-        {
-            await _browser.DisposeAsync();
-        }
-        
-        public static async Task<OnlinerByApiLinkInterceptor> Launch() {
-            var browser = await Puppeteer.LaunchAsync(new LaunchOptions
+    public static class OnlinerByApiLinkInterceptor {
+        static async Task<OnlinerApiLink> Intercept(string onlinerUrl, CancellationToken ct) {
+            var tcs = new TaskCompletionSource<string>();
+            await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
             {
                 Headless = true
             });
-            return new OnlinerByApiLinkInterceptor(browser);
-        }
-        
-        public async Task<OnlinerApiLink> Intercept(string onlinerUrl) {
-            var tcs = new TaskCompletionSource<string>();
-            var page = await _browser.NewPageAsync();
+            var page = await browser.NewPageAsync();
             page.Request += async (_, args) => {
                 var request = args.Request;
                 var url = request.Url;
@@ -30,19 +19,20 @@ namespace OnlinerByFlatBot.OnlinerBy {
                 await request.ContinueAsync();
             };
             await page.SetRequestInterceptionAsync(true);
+            await page.GoToAsync(onlinerUrl);
+            var apiUrlTask = tcs.Task;
+            var apiUrl = await tcs.Task;
+            return new OnlinerApiLink(apiUrl, "");
+        }
+
+        public static async Task<OnlinerApiLink> Intercept(string onlinerUrl) {
+            var timeout = TimeSpan.FromSeconds(30);
+            var cts = new CancellationTokenSource(timeout);
             try {
-                await page.GoToAsync(onlinerUrl);
-                var apiUrlTask = tcs.Task;
-                var timeout = TimeSpan.FromSeconds(10);
-                var timeoutTask = Task.Delay(timeout);
-                if (await Task.WhenAny(apiUrlTask, timeoutTask) == timeoutTask) {
-                    throw new TimeoutException($"Onliner API link interception failed by timeout ({timeout}).");
-                }
-                var apiUrl = await tcs.Task;
-                return new OnlinerApiLink(apiUrl, "");
+                return await Intercept(onlinerUrl, cts.Token);
             }
-            finally {
-                await page.CloseAsync();
+            catch (OperationCanceledException) {
+                throw new TimeoutException($"Onliner API link interception failed by timeout ({timeout}).");
             }
         }
     }
