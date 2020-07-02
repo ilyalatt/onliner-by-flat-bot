@@ -54,25 +54,28 @@ namespace OnlinerByFlatBot
 
         static readonly AsyncRetryPolicy TelegramPollyPolicy = Policy
             .Handle<ApiRequestException>()
-            .WaitAndRetryAsync(4, ExpDelay);
+            .WaitAndRetryAsync(6, ExpDelay);
 
         static readonly AsyncRetryPolicy OnlinerByPollyPolicy = Policy
             .Handle<HttpRequestException>()
             .Or<OperationCanceledException>()
             .Or<FlurlHttpException>(x => x.Call.HttpResponseMessage.StatusCode != HttpStatusCode.NotFound)
-            .WaitAndRetryAsync(4, ExpDelay);
+            .WaitAndRetryAsync(6, ExpDelay);
 
         static readonly AsyncRetryPolicy YandexMapsPollyPolicy = Policy
             .Handle<PuppeteerException>()
             .Or<TimeoutException>()
-            .WaitAndRetryAsync(4, ExpDelay);
+            .WaitAndRetryAsync(6, ExpDelay);
 
         static readonly AsyncRetryPolicy BotPollyPolicy = Policy
             .Handle<Exception>()
             .WaitAndRetryForeverAsync(sleepDurationProvider: _ => TimeSpan.FromSeconds(10), onRetry: (ex, _) => Console.WriteLine(ex));
 
-        static Func<ITelegramBotClient, Task<T>> TelegramWithPolly<T>(Func<ITelegramBotClient, Task<T>> f) =>
-            x => TelegramPollyPolicy.ExecuteAsync(() => f(x));
+        static Func<ITelegramBotClient, Task<T>> TelegramWithDelayAndPolly<T>(Func<ITelegramBotClient, Task<T>> f) =>
+            async x => {
+                await Task.Delay(500);
+                return await TelegramPollyPolicy.ExecuteAsync(() => f(x));
+            };
 
         static Func<OnlinerByClient, Task<T>> OnlinerByWithPolly<T>(Func<OnlinerByClient, Task<T>> f) =>
             x => OnlinerByPollyPolicy.ExecuteAsync(() => f(x));
@@ -106,7 +109,7 @@ namespace OnlinerByFlatBot
                 string caption = null,
                 bool disableNotification = true
             ) =>
-                TelegramWithPolly(x =>
+                TelegramWithDelayAndPolly(x =>
                     x.SendPhotoAsync(
                         chatId: chatId,
                         photo: new InputOnlineFile(
@@ -143,7 +146,7 @@ namespace OnlinerByFlatBot
             }
 
             Task SendPhotosResiliently(IEnumerable<IAlbumInputMedia> photos) =>
-                TelegramWithPolly(x => x.SendMediaGroupAsync(photos, chatId, disableNotification: true))(tg);
+                TelegramWithDelayAndPolly(x => x.SendMediaGroupAsync(photos, chatId, disableNotification: true))(tg);
 
             Task SendPhotoBatch(IEnumerable<(byte[], string)> photoSeq) => photoSeq
                 .Filter(x => IsAcceptablePhoto(x.Item1))
