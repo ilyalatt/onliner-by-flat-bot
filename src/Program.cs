@@ -141,14 +141,14 @@ namespace OnlinerByFlatBot
             var type = flat.Type.Apply(FlatType.Match(
                 _: () => flat.Type,
                 room: () => "комната",
-                flatWithNRooms: n => n + "-комнатная"
+                flatWithNRooms: n => n + "-комнатная квартира"
             ));
             var txt = new [] {
-                $"{(isNew ? "Новая хата" : $"UP, создано {timeSinceCreation.Humanize()} назад")}",
-                $"${flat.Price.Dollars}, {type}",
+                $"{(isNew ? "" : $"UP (объявление создано {timeSinceCreation.Humanize()} назад)")}",
+                $"{type} за {flat.Price.Dollars}$",
                 $"{flat.Address.TrimStart("Минск, ")}",
                 flat.Url
-            }.Apply(xs => string.Join(Environment.NewLine, xs));
+            }.Filter(x => x.Length > 0).Apply(xs => string.Join(Environment.NewLine, xs));
             Log.Information($"[{channelName}] Processing flat:" + Environment.NewLine + txt);
 
             try
@@ -162,7 +162,7 @@ namespace OnlinerByFlatBot
             }
 
             Task SendPhotosResiliently(IEnumerable<IAlbumInputMedia> photos) =>
-                TelegramWithDelayAndPolly(x => x.SendMediaGroupAsync(photos, chatId, disableNotification: true))(tg);
+                TelegramWithDelayAndPolly(x => x.SendMediaGroupAsync(chatId, photos, disableNotification: true))(tg);
 
             Task SendPhotoBatch(IEnumerable<(byte[], string)> photoSeq) => photoSeq
                 .Filter(x => IsAcceptablePhoto(x.Item1))
@@ -230,7 +230,7 @@ namespace OnlinerByFlatBot
 
             await cfg.Channels.Filter(x => x.Enabled ?? true).Map(async channel =>
             {
-                var state = (await State.Read(channel.Name)).IfNone(() => new State { LastScrapedEntityDate = DateTime.Now });
+                var state = (await State.Read(channel.Name)).IfNone(() => new State { LastScrapedEntityDate = DateTime.Now.AddMinutes(-30) });
                 await BotPollyPolicy.ExecuteAsync(() => RunBot(channel, telegramBot, state));
             }).Apply(Task.WhenAll);
         }

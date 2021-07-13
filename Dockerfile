@@ -1,11 +1,11 @@
-FROM mcr.microsoft.com/dotnet/core/sdk:3.1 as build
+FROM mcr.microsoft.com/dotnet/sdk:5.0 as build
 
 COPY ./src /src
 WORKDIR /src
 RUN dotnet publish --configuration Release --runtime linux-x64 --output /build
 
 
-FROM mcr.microsoft.com/dotnet/core/runtime:3.1
+FROM mcr.microsoft.com/dotnet/runtime:5.0
 
 # http://www.hardkoded.com/blog/puppeteer-sharp-docker
 RUN apt-get update && \

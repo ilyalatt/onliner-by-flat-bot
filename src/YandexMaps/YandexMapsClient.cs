@@ -75,6 +75,7 @@ namespace OnlinerByFlatBot.YandexMaps
             );
             await HideElements(
                 ".popup",
+                "[data-id*=popup",
                 ".lg-cc",
                 "[class*=show-details]",
                 ".route-list-view__incut",

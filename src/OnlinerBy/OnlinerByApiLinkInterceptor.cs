@@ -5,35 +5,46 @@ using PuppeteerSharp;
 
 namespace OnlinerByFlatBot.OnlinerBy {
     public static class OnlinerByApiLinkInterceptor {
-        static async Task<OnlinerApiLink> Intercept(string onlinerUrl, CancellationToken ct) {
-            var tcs = new TaskCompletionSource<string>();
-            await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions
-            {
+        static async Task<OnlinerApiLink> InterceptImpl(string onlinerUrl) {
+            var timeout = TimeSpan.FromSeconds(30);
+            var timeoutCts = new TaskCompletionSource(timeout);
+            var timeoutTask = timeoutCts.Task;
+            
+            var resultTcs = new TaskCompletionSource<string>();
+            var resultTask = resultTcs.Task;
+            await using var browser = await Puppeteer.LaunchAsync(new LaunchOptions {
                 Headless = true
             });
-            await Task.Delay(1000); // avoids PuppeteerSharp.NavigationException: Navigation failed because browser has disconnected!
             var page = await browser.NewPageAsync();
             page.Request += async (_, args) => {
                 var request = args.Request;
                 var url = request.Url;
-                if (url.Contains("api.onliner.by") && url.Contains("apartments")) tcs.SetResult(url);
+                if (url.StartsWith("https://r.onliner.by/sdapi/ak.api/search/apartments")) {
+                    resultTcs.SetResult(url);
+                }
                 await request.ContinueAsync();
             };
             await page.SetRequestInterceptionAsync(true);
-            await page.GoToAsync(onlinerUrl);
-            var apiUrlTask = tcs.Task;
-            var apiUrl = await tcs.Task;
+            
+            var navigationTask = page.GoToAsync(onlinerUrl, WaitUntilNavigation.DOMContentLoaded);
+            await Task.WhenAny(navigationTask, resultTask, timeoutTask);
+            if (!resultTask.IsCompleted) {
+                await Task.WhenAny(navigationTask, timeoutTask);
+            }
+            await Task.WhenAny(resultTask, timeoutTask);
+            if (timeoutTask.IsFaulted) {
+                await timeoutTask;
+            }
+            var apiUrl = await resultTask;
             return new OnlinerApiLink(apiUrl, "");
         }
 
         public static async Task<OnlinerApiLink> Intercept(string onlinerUrl) {
-            var timeout = TimeSpan.FromSeconds(30);
-            var cts = new CancellationTokenSource(timeout);
             try {
-                return await Intercept(onlinerUrl, cts.Token);
+                return await InterceptImpl(onlinerUrl);
             }
             catch (OperationCanceledException) {
-                throw new TimeoutException($"Onliner API link interception failed by timeout ({timeout}).");
+                throw new TimeoutException("Onliner API link interception failed by timeout.");
             }
         }
     }
